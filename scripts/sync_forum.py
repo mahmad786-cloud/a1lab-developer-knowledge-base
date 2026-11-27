@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 SITE_URL = "https://forum.a1lab.tech"
 MAIN_SITE_URL = "https://a1lab.tech"
 API_BASE = f"{SITE_URL}/api/v3/post/list"
+INDEXNOW_KEY = "a3071ef3c90e4c4f8dc77102aba3d500"
 
 STOP_WORDS = {
     "a", "an", "the", "is", "are", "was", "were", "do", "does", "did",
@@ -77,6 +78,28 @@ def extract_clean_teaser(body: str, max_len: int = 190) -> str:
             return cut[: last_period + 1]
         return cut.rsplit(" ", 1)[0].rstrip(" ,;:") + "..."
     return ""
+
+def submit_to_indexnow(urls: list[str]) -> None:
+    if not INDEXNOW_KEY or not urls:
+        return
+    try:
+        payload = json.dumps({
+            "host": "forum.a1lab.tech",
+            "key": INDEXNOW_KEY,
+            "keyLocation": f"{SITE_URL}/{INDEXNOW_KEY}.txt",
+            "urlList": urls[:100],
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            "[https://api.indexnow.org/indexnow](https://api.indexnow.org/indexnow)",
+            data=payload,
+            headers={"Content-Type": "application/json; charset=utf-8"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            print(f"IndexNow ping status: {resp.status} ({len(urls[:100])} URLs submitted)")
+    except Exception as e:
+        print(f"IndexNow ping skipped: {e}")
 
 def main() -> None:
     items = fetch_all_posts()
@@ -181,6 +204,8 @@ def main() -> None:
 
     Path("llms.txt").write_text("\n".join(llms_lines).strip() + "\n", encoding="utf-8")
     print(f"Successfully synced {total_posts} posts across {len(by_community)} communities.")
+
+    submit_to_indexnow([p["url"] for p in recent_posts])
 
 if __name__ == "__main__":
     main()
